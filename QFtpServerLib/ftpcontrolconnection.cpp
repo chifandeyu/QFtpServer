@@ -15,6 +15,8 @@
 #include <QTimer>
 #include <QSslSocket>
 
+#include <QRegularExpression>
+
 FtpControlConnection::FtpControlConnection(QObject *parent, QSslSocket *socket, const QString &rootPath, const QString &userName, const QString &password, bool readOnly) :
     QObject(parent)
 {
@@ -137,7 +139,7 @@ QString FtpControlConnection::toLocalPath(const QString &fileName) const
     // Note we do this **before** prepending the root path, in order to avoid
     // "jailbreaking" out of the "chroot".
     QStringList components;
-    foreach (const QString &component, localPath.split('/', QString::SkipEmptyParts)) {
+    foreach (const QString &component, localPath.split('/', Qt::SkipEmptyParts)) {
         if (component == "..") {
             if (!components.isEmpty()) {
                 components.pop_back();
@@ -256,10 +258,30 @@ void FtpControlConnection::port(const QString &addressAndPort)
     // PORT h1,h2,h3,h4,p1,p2
 
     // Get IP and port.
+    QString hostName;
+    int port = 0;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    QRegularExpression exp("\\s*(\\d+,\\d+,\\d+,\\d+),(\\d+),(\\d+)");
+    auto match = exp.match(addressAndPort);
+    if(match.hasMatch()) {
+        hostName = match.captured(1).replace(',', '.');
+        int h = match.captured(2).toInt();
+        int l = match.captured(3).toInt();
+        port = h * 256 + l;
+    }
+#else
     QRegExp exp("\\s*(\\d+,\\d+,\\d+,\\d+),(\\d+),(\\d+)");
-    exp.indexIn(addressAndPort);
-    QString hostName = exp.cap(1).replace(',', '.');
-    int port = exp.cap(2).toInt() * 256 + exp.cap(3).toInt();
+    if (exp.indexIn(addressAndPort) != -1) {
+        QString hostName = exp.cap(1).replace(',', '.');
+        int h = exp.cap(2).toInt();
+        int l = exp.cap(3).toInt();
+        port = h * 256 + l;
+    }
+#endif
+    if(hostName.isEmpty()) {
+        reply("address or port invalid!!!");
+        return;
+    }
     dataConnection->scheduleConnectToHost(hostName, port, encryptDataConnection);
     reply("200 Command okay.");
 }

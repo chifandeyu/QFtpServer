@@ -3,10 +3,17 @@
 #include <ftpserver.h>
 #include <QDebug>
 #include <QDateTime>
+#include <QRandomGenerator>
 
 QChar getRandomChar()
 {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    const int range = 'z'-'a' + 1;
+    const int randomNumber = QRandomGenerator::global()->bounded(range);
+    return QChar('a' + randomNumber);
+#else
     return QChar('a' + (qrand()%('z'-'a')));
+#endif
 }
 
 QString getRandomString(int n)
@@ -21,9 +28,10 @@ QString getRandomString(int n)
 int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
-
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
     // Seed the random numbers.
     qsrand(QTime::currentTime().msec());
+#endif
 
     const QString &userName = getRandomString(3);
     const QString &password = getRandomString(3);
